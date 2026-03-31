@@ -36,8 +36,6 @@ def main() -> None:
 
     bruce = WalkerCharacter(resource_path("assets/bruce.gif"), parent=container)
     jazz = WalkerCharacter(resource_path("assets/jazz.gif"), parent=container)
-    bruce.resize(80, 80)
-    jazz.resize(80, 80)
     bruce.move(100, 0)
     jazz.move(350, 0)
     bruce.show()

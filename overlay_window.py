@@ -4,7 +4,7 @@ from ctypes import wintypes
 from PyQt6.QtWidgets import QMainWindow, QWidget
 from PyQt6.QtCore import Qt, QRect
 
-OVERLAY_HEIGHT = 80  # px — should match GIF height
+OVERLAY_HEIGHT = 150  # px — tall enough for 80x142 character GIFs
 ABM_GETTASKBARPOS = 0x00000005
 WDA_EXCLUDEFROMCAPTURE = 0x00000011
 

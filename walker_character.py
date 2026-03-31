@@ -16,6 +16,9 @@ class WalkerCharacter(QLabel):
         self._movie = QMovie(gif_path)
         self._movie.frameChanged.connect(self._update_frame)
         self._movie.start()
+        # Size the label to the GIF's natural dimensions after the first frame loads
+        self._movie.jumpToFrame(0)
+        self.adjustSize()
         self._timer = QTimer(self)
         self._timer.setInterval(TIMER_INTERVAL)
         self._timer.timeout.connect(self._step)
