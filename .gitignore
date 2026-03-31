@@ -7,3 +7,11 @@ dist/
 build/
 *.spec.bak
 .pytest_cache/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+*.egg-info/
+.coverage*
+htmlcov/
