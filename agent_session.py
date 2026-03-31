@@ -1,4 +1,7 @@
-from PyQt6.QtCore import QObject, QProcess, pyqtSignal
+import subprocess
+import threading
+
+from PyQt6.QtCore import QObject, pyqtSignal
 
 
 class AgentSession(QObject):
@@ -8,41 +11,54 @@ class AgentSession(QObject):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._process = QProcess(self)
-        self._process.readyReadStandardOutput.connect(self._on_stdout)
-        self._process.readyReadStandardError.connect(self._on_stderr)
-        self._process.finished.connect(self._on_finished)
+        self._proc = None
+        self._lock = threading.Lock()
 
     def _command(self) -> tuple[str, list[str]]:
-        """Return (program, base_args). Input text is appended as the last arg."""
         raise NotImplementedError
 
     def send(self, text: str) -> None:
-        if self._process.state() != QProcess.ProcessState.NotRunning:
-            self._process.kill()
-            self._process.waitForFinished(1000)
+        self.stop()
         program, args = self._command()
-        self._process.start(program, args + [text])
+        try:
+            self._proc = subprocess.Popen(
+                [program] + args + [text],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
+            )
+        except FileNotFoundError:
+            self.error_received.emit(f"Could not find '{program}'. Is it installed and on PATH?")
+            return
+
+        proc = self._proc
+        threading.Thread(target=self._read_stdout, args=(proc,), daemon=True).start()
+        threading.Thread(target=self._read_stderr, args=(proc,), daemon=True).start()
+        threading.Thread(target=self._wait_finish, args=(proc,), daemon=True).start()
+
+    def _read_stdout(self, proc) -> None:
+        for chunk in iter(lambda: proc.stdout.read(256), b""):
+            text = chunk.decode("utf-8", errors="replace")
+            self.output_received.emit(text)
+        proc.stdout.close()
+
+    def _read_stderr(self, proc) -> None:
+        for chunk in iter(lambda: proc.stderr.read(256), b""):
+            text = chunk.decode("utf-8", errors="replace")
+            self.error_received.emit(text)
+        proc.stderr.close()
+
+    def _wait_finish(self, proc) -> None:
+        proc.wait()
+        with self._lock:
+            if self._proc is proc:
+                self._proc = None
+        self.finished.emit()
 
     def stop(self) -> None:
-        if self._process.state() != QProcess.ProcessState.NotRunning:
-            self._process.kill()
-            self._process.waitForFinished(1000)
-
-    def _on_stdout(self) -> None:
-        data = self._process.readAllStandardOutput().data().decode("utf-8", errors="replace")
-        self.output_received.emit(data)
-
-    def _on_stderr(self) -> None:
-        data = self._process.readAllStandardError().data().decode("utf-8", errors="replace")
-        self.error_received.emit(data)
-
-    def _on_finished(self) -> None:
-        # Flush any remaining stdout/stderr before emitting finished
-        remaining_out = self._process.readAllStandardOutput().data()
-        if remaining_out:
-            self.output_received.emit(remaining_out.decode("utf-8", errors="replace"))
-        remaining_err = self._process.readAllStandardError().data()
-        if remaining_err:
-            self.error_received.emit(remaining_err.decode("utf-8", errors="replace"))
-        self.finished.emit()
+        with self._lock:
+            proc = self._proc
+            self._proc = None
+        if proc and proc.poll() is None:
+            proc.kill()
+            proc.wait()

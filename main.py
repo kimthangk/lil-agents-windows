@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox
 from PyQt6.QtGui import QIcon, QAction
 from PyQt6.QtCore import QPoint
 
-from overlay_window import OverlayWindow, get_taskbar_rect
+from overlay_window import OverlayWindow, get_taskbar_rect, OVERLAY_HEIGHT
 from walker_character import WalkerCharacter
 from chat_popover import ChatPopover, compute_popover_pos
 from claude_session import ClaudeSession
@@ -41,12 +41,17 @@ def main() -> None:
     overlay = OverlayWindow(screen_width, taskbar_rect)
     container = overlay.centralWidget()
 
-    bruce = WalkerCharacter(resource_path("assets/bruce.gif"), parent=container)
-    jazz = WalkerCharacter(resource_path("assets/jazz.gif"), parent=container)
-    bruce.move(100, 0)
-    jazz.move(350, 0)
+    # Walk timing from original LilAgentsController.swift (per-character)
+    bruce = WalkerCharacter(resource_path("assets/bruce.gif"), parent=container,
+                            accel_start=3.0, full_speed_start=3.75, decel_start=8.0, walk_stop=8.5)
+    jazz = WalkerCharacter(resource_path("assets/jazz.gif"), parent=container,
+                           accel_start=3.9, full_speed_start=4.5, decel_start=8.0, walk_stop=8.75)
+    bruce.move(100, OVERLAY_HEIGHT - bruce.height())
+    jazz.move(350, OVERLAY_HEIGHT - jazz.height())
     bruce.show()
     jazz.show()
+
+    active_popovers: list = []
 
     def on_character_clicked(character: WalkerCharacter) -> None:
         character.pause()
@@ -63,7 +68,13 @@ def main() -> None:
         char_global = character.mapToGlobal(QPoint(0, 0))
         pos = compute_popover_pos(char_global, character.width(), screen_width)
         popover.move(pos)
-        popover.closed.connect(character.resume)
+
+        def _on_closed():
+            character.resume()
+            active_popovers.remove(popover)
+
+        popover.closed.connect(_on_closed)
+        active_popovers.append(popover)
         popover.show()
 
     bruce.clicked.connect(on_character_clicked)
@@ -88,6 +99,7 @@ def main() -> None:
     menu.addSeparator()
     menu.addAction(quit_action)
     tray.setContextMenu(menu)
+    tray.setToolTip("Lil Agents — right-click to quit")
     tray.show()
 
     overlay.show()
