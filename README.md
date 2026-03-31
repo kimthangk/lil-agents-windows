@@ -80,7 +80,7 @@ Lil Agents for Windows runs entirely on your machine and sends no data anywhere.
 ## credits
 
 - **Original concept, character design, and animations:** [Ryan Stephen](https://github.com/ryanstephen/lil-agents) — [lilagents.xyz](https://lilagents.xyz)
-- **Windows port:** built with Python + PyQt6
+- **Windows port:** Thanakorn Angkasirisan — built with Python + PyQt6
 
 ## license
 
