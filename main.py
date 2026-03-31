@@ -28,7 +28,14 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
+    # Win32 SHAppBarMessage returns physical pixels; Qt uses logical pixels.
+    # Divide by devicePixelRatio to get logical coordinates.
+    dpi = app.primaryScreen().devicePixelRatio()
     taskbar_rect = get_taskbar_rect()
+    taskbar_rect.left = int(taskbar_rect.left / dpi)
+    taskbar_rect.top = int(taskbar_rect.top / dpi)
+    taskbar_rect.right = int(taskbar_rect.right / dpi)
+    taskbar_rect.bottom = int(taskbar_rect.bottom / dpi)
     screen_width = app.primaryScreen().geometry().width()
 
     overlay = OverlayWindow(screen_width, taskbar_rect)
