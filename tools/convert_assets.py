@@ -44,6 +44,15 @@ def main() -> None:
     assets_dir = Path(__file__).parent.parent / "assets"
     assets_dir.mkdir(exist_ok=True)
 
+    required = {
+        mov_dir / "walk-bruce-01.mov": "Bruce animation",
+        mov_dir / "walk-jazz-01.mov": "Jazz animation",
+        mov_dir / "menuicon.png": "Menu icon",
+    }
+    for fpath, name in required.items():
+        if not fpath.exists():
+            raise FileNotFoundError(f"{name} not found: {fpath}")
+
     print("Converting bruce.gif ...")
     convert_gif(mov_dir / "walk-bruce-01.mov", assets_dir / "bruce.gif")
 
