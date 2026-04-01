@@ -52,7 +52,6 @@ class ThinkingBubble(QWidget):
     def __init__(self, character: "WalkerCharacter", accent_color: str, parent=None):
         super().__init__(parent)
         self._character = character
-        self._accent = accent_color
 
         self.setStyleSheet(
             f"background: #1e1e2e; border: 1.5px solid {accent_color}; border-radius: 10px;"
@@ -79,6 +78,8 @@ class ThinkingBubble(QWidget):
         self._timer.start(random.randint(3000, 5000))
 
     def _reposition(self) -> None:
+        # Position is updated each time a phrase rotates. The character must
+        # be paused while the bubble is visible to avoid positional drift.
         char = self._character
         cx = char.x() + char.width() // 2
         cy = char.y()
@@ -242,8 +243,8 @@ class WalkerCharacter(QLabel):
         """Stop thinking state. If done=True and popover not open, show 'done!' briefly."""
         self._bubble.stop(done=done and not self._popover_open)
 
-    def set_popover_open(self, open: bool) -> None:
+    def set_popover_open(self, is_open: bool) -> None:
         """Track whether the chat popover is open (suppresses the thinking bubble)."""
-        self._popover_open = open
-        if open:
+        self._popover_open = is_open
+        if is_open:
             self._bubble.stop(done=False)
