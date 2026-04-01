@@ -3,7 +3,7 @@ import sys
 
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox
 from PyQt6.QtGui import QIcon, QAction
-from PyQt6.QtCore import QPoint
+from PyQt6.QtCore import QPoint, Qt
 
 from overlay_window import OverlayWindow, get_taskbar_rect, OVERLAY_HEIGHT
 from walker_character import WalkerCharacter
@@ -43,9 +43,11 @@ def main() -> None:
 
     # Walk timing from original LilAgentsController.swift (per-character)
     bruce = WalkerCharacter(resource_path("assets/bruce.gif"), parent=container,
-                            accel_start=3.0, full_speed_start=3.75, decel_start=8.0, walk_stop=8.5)
+                            accel_start=3.0, full_speed_start=3.75, decel_start=8.0, walk_stop=8.5,
+                            accent_color="#a6e3a1")
     jazz = WalkerCharacter(resource_path("assets/jazz.gif"), parent=container,
-                           accel_start=3.9, full_speed_start=4.5, decel_start=8.0, walk_stop=8.75)
+                           accel_start=3.9, full_speed_start=4.5, decel_start=8.0, walk_stop=8.75,
+                           accent_color="#fab387")
     bruce.move(100, OVERLAY_HEIGHT - bruce.height())
     jazz.move(350, OVERLAY_HEIGHT - jazz.height())
     bruce.show()
@@ -53,12 +55,18 @@ def main() -> None:
 
     active_popovers: list = []
 
+    CHARACTER_INFO = {
+        id(bruce): ("Bruce", "#a6e3a1"),
+        id(jazz):  ("Jazz",  "#fab387"),
+    }
+
     def on_character_clicked(character: WalkerCharacter) -> None:
         character.pause()
+        name, accent_color = CHARACTER_INFO[id(character)]
         provider = get_provider()
         session = _make_session(provider)
 
-        popover = ChatPopover(provider)
+        popover = ChatPopover(name, accent_color, provider)
         popover.set_session(session)
 
         cli_name = "claude" if provider == "claude" else "gemini"
@@ -69,7 +77,14 @@ def main() -> None:
         pos = compute_popover_pos(char_global, character.width(), screen_width)
         popover.move(pos)
 
+        character.set_popover_open(True)
+
+        qt = Qt.ConnectionType.QueuedConnection
+        popover.thinking_started.connect(character.show_thinking, qt)
+        session.finished.connect(lambda: character.hide_thinking(done=True), qt)
+
         def _on_closed():
+            character.set_popover_open(False)
             character.resume()
             active_popovers.remove(popover)
 
