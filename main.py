@@ -55,6 +55,7 @@ def main() -> None:
 
     active_popovers: list = []
 
+    # Keyed by id() because QLabel subclasses are not reliably hashable in PyQt6.
     CHARACTER_INFO = {
         id(bruce): ("Bruce", "#a6e3a1"),
         id(jazz):  ("Jazz",  "#fab387"),
