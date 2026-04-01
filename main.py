@@ -82,9 +82,17 @@ def main() -> None:
 
         qt = Qt.ConnectionType.QueuedConnection
         popover.thinking_started.connect(character.show_thinking, qt)
-        session.finished.connect(lambda: character.hide_thinking(done=True), qt)
+
+        def _on_session_finished():
+            character.hide_thinking(done=True)
+
+        session.finished.connect(_on_session_finished, qt)
 
         def _on_closed():
+            try:
+                session.finished.disconnect(_on_session_finished)
+            except RuntimeError:
+                pass
             character.set_popover_open(False)
             character.resume()
             active_popovers.remove(popover)
