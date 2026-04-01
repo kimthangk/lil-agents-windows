@@ -118,7 +118,7 @@ class ChatPopover(QDialog):
         self._session = None
         self._last_response = ""
         self._raw_response = ""
-        self._response_start_pos = 0
+        self._response_cursor: QTextCursor | None = None
         self._is_receiving = False
         self._setup_ui()
         self.setStyleSheet(_BASE_STYLE.format(accent=accent_color))
@@ -229,13 +229,13 @@ class ChatPopover(QDialog):
 
         self._last_response = ""
         self._raw_response = ""
-        self._response_start_pos = 0
+        self._response_cursor = None
         self._is_receiving = False
         self._status.setText("Thinking...")
         self._input.setEnabled(False)
         if self._session:
             self._session.send(text)
-            self.thinking_started.emit()
+        self.thinking_started.emit()
 
     def _on_output(self, text: str) -> None:
         self._raw_response += text
@@ -249,10 +249,10 @@ class ChatPopover(QDialog):
             fmt = QTextCharFormat()
             fmt.setForeground(QColor(self._accent))
             cursor.insertText(f"{self._name}: ", fmt)
-            self._response_start_pos = cursor.position()
+            self._response_cursor = self._output.textCursor()
 
         # Replace everything from response start to end with raw text + cursor
-        cursor.setPosition(self._response_start_pos)
+        cursor = QTextCursor(self._response_cursor)
         cursor.movePosition(QTextCursor.MoveOperation.End, QTextCursor.MoveMode.KeepAnchor)
         fmt = QTextCharFormat()
         fmt.setForeground(QColor("#cdd6f4"))
@@ -269,14 +269,15 @@ class ChatPopover(QDialog):
         self._output.setTextCursor(cursor)
 
     def _on_finished(self) -> None:
+        if not self.isVisible():
+            return
         if self._is_receiving and self._raw_response:
             # Replace the streamed raw block with rendered HTML
             html = _md.markdown(
                 self._raw_response,
                 extensions=["fenced_code", "nl2br"],
             )
-            cursor = self._output.textCursor()
-            cursor.setPosition(self._response_start_pos)
+            cursor = QTextCursor(self._response_cursor)
             cursor.movePosition(QTextCursor.MoveOperation.End, QTextCursor.MoveMode.KeepAnchor)
             cursor.insertHtml(html)
             self._last_response = self._raw_response
