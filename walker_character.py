@@ -1,8 +1,8 @@
 import random
 
-from PyQt6.QtWidgets import QLabel
+from PyQt6.QtWidgets import QLabel, QWidget, QHBoxLayout
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QMovie, QTransform
+from PyQt6.QtGui import QMovie, QTransform, QFont
 
 # GIF properties (15 fps, 151 frames ≈ 10 s — matches original .mov)
 GIF_FPS = 15.0
@@ -14,6 +14,15 @@ WALK_MAX_PX = 250
 # Pause between walks (seconds)
 PAUSE_MIN = 5.0
 PAUSE_MAX = 12.0
+
+_THINKING_PHRASES = [
+    "hmm...", "thinking...", "one sec...", "ok hold on", "let me check",
+    "working on it", "almost...", "bear with me", "on it!", "gimme a sec",
+    "brb", "processing...", "hang tight", "just a moment", "figuring it out",
+    "crunching...", "reading...", "looking...", "cooking...", "vibing...",
+    "digging in", "connecting dots", "give me a sec", "don't rush me",
+    "calculating...", "assembling...",
+]
 
 
 def _movement_norm(video_time: float, accel_start: float, full_speed_start: float,
@@ -39,12 +48,67 @@ def _movement_norm(video_time: float, accel_start: float, full_speed_start: floa
         return 1.0
 
 
+class ThinkingBubble(QWidget):
+    def __init__(self, character: "WalkerCharacter", accent_color: str, parent=None):
+        super().__init__(parent)
+        self._character = character
+        self._accent = accent_color
+
+        self.setStyleSheet(
+            f"background: #1e1e2e; border: 1.5px solid {accent_color}; border-radius: 10px;"
+        )
+        self.setMinimumWidth(60)
+        self.setFixedHeight(24)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(8, 0, 8, 0)
+        self._label = QLabel()
+        self._label.setFont(QFont("Consolas", 9))
+        self._label.setStyleSheet(f"color: {accent_color}; border: none; background: transparent;")
+        layout.addWidget(self._label)
+
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._rotate_phrase)
+        self.hide()
+
+    def _rotate_phrase(self) -> None:
+        self._label.setText(random.choice(_THINKING_PHRASES))
+        self.adjustSize()
+        self._reposition()
+        self._timer.start(random.randint(3000, 5000))
+
+    def _reposition(self) -> None:
+        char = self._character
+        cx = char.x() + char.width() // 2
+        cy = char.y()
+        self.move(cx - self.width() // 2, cy - self.height() - 6)
+
+    def start(self) -> None:
+        self._rotate_phrase()
+        self.show()
+        self.raise_()
+
+    def stop(self, done: bool = False) -> None:
+        self._timer.stop()
+        if done:
+            self._label.setText("done!")
+            self.adjustSize()
+            self._reposition()
+            self.show()
+            self.raise_()
+            QTimer.singleShot(2000, self.hide)
+        else:
+            self.hide()
+
+
 class WalkerCharacter(QLabel):
     clicked = pyqtSignal(object)
 
     def __init__(self, gif_path: str, parent=None,
                  accel_start: float = 3.0, full_speed_start: float = 3.75,
-                 decel_start: float = 8.0, walk_stop: float = 8.5):
+                 decel_start: float = 8.0, walk_stop: float = 8.5,
+                 accent_color: str = "#a6e3a1"):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
@@ -77,6 +141,8 @@ class WalkerCharacter(QLabel):
         self._pause_timer.timeout.connect(self._start_walk)
         delay_ms = int(random.uniform(1000, 3000))
         self._pause_timer.start(delay_ms)
+        self._popover_open = False
+        self._bubble = ThinkingBubble(self, accent_color, parent)
 
     # ------------------------------------------------------------------
     # Frame-driven update — single source of truth for both visuals + position
@@ -166,3 +232,18 @@ class WalkerCharacter(QLabel):
     def mousePressEvent(self, event) -> None:
         self.clicked.emit(self)
         super().mousePressEvent(event)
+
+    def show_thinking(self) -> None:
+        """Start thinking state. Bubble only shown if popover is not open."""
+        if not self._popover_open:
+            self._bubble.start()
+
+    def hide_thinking(self, done: bool = False) -> None:
+        """Stop thinking state. If done=True and popover not open, show 'done!' briefly."""
+        self._bubble.stop(done=done and not self._popover_open)
+
+    def set_popover_open(self, open: bool) -> None:
+        """Track whether the chat popover is open (suppresses the thinking bubble)."""
+        self._popover_open = open
+        if open:
+            self._bubble.stop(done=False)
